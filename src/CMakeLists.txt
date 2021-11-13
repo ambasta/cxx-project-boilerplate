@@ -1,8 +1,16 @@
-include(FindPkgConfig)
+# include(FindPkgConfig)
 
-find_package(PkgConfig REQUIRED)
+# find_package(PkgConfig REQUIRED)
+# pkg_check_modules(GLIB_DEPS REQUIRED IMPORTED_TARGET glibmm-2.68)
 
-pkg_check_modules(GLIB_DEPS REQUIRED IMPORTED_TARGET glib-2.0)
+add_library(
+  lib${PROJECT_NAME}
+  algorithm.cxx
+  otp.cxx
+)
 
-add_library(libauthen database.cxx)
-target_link_libraries(authenticator PkgConf::GLIB_DEPS)
+target_link_libraries(
+  lib${PROJECT_NAME}
+  ${PROJECT_NAME}_headers
+  # PkgConfig::GLIB_DEPS
+)

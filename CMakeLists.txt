@@ -120,5 +120,6 @@ install(
   COMPONENT
   runtime
 )
-
+add_subdirectory(iface)
 add_subdirectory(src)
+add_subdirectory(tests)
