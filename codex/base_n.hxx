@@ -3,6 +3,7 @@
 
 #include "concepts.hxx"
 #include "properties.hxx"
+#include <climits>
 #include <codecvt>
 #include <locale>
 #include <span>
@@ -11,44 +12,42 @@ template <typename DerivedT> class BaseNEncoder {
 public:
   template <typename T> static std::string encode(const T *, const size_t);
 
-  // static std::string_view encode(const uint8_t *, const size_t);
-
-  template <std::ranges::input_range RangeT>
+  template <EncodingInputConcept RangeT>
   static auto encode(const RangeT &data) -> std::vector<uint8_t> {
-    using DATA_TYPE = std::ranges::range_value_t<RangeT>;
-    constexpr uint8_t DATA_TYPE_SIZE = sizeof(DATA_TYPE);
-    constexpr uint8_t ENCODED_BIT_SIZE =
-        DerivedT::BitsPerByte * DerivedT::EncodedBitsPerByte;
-    constexpr uint8_t DATA_SIZE = DATA_TYPE_SIZE * data.size();
+    using value_type = std::ranges::range_value_t<RangeT>;
 
-    // std::wstring_convert<std::codecvt_utf8<DATA_TYPE>, DATA_TYPE> converter;
+    constexpr uint8_t value_size = sizeof(value_type) * CHAR_BIT;
+    constexpr uint8_t ENCODED_WORD_SIZE =
+        CHAR_BIT * DerivedT::EncodedBitsPerByte;
+    const uint8_t DATA_SIZE = value_size * data.size();
+
     uint8_t byte_encoded = 0;
     uint8_t bits_encoded = 0;
     uint8_t bytes_encoded = 0;
     std::vector<uint8_t> result;
-    result.reserve(
-        ((DATA_SIZE / ENCODED_BIT_SIZE) + DATA_SIZE % ENCODED_BIT_SIZE == 0
-             ? 0
-             : 1) *
-        DerivedT::BitsPerByte);
+    result.reserve(((DATA_SIZE / ENCODED_WORD_SIZE) +
+                    (DATA_SIZE % ENCODED_WORD_SIZE == 0 ? 0 : 1)));
 
     for (const auto &value : data) {
-      // const auto converted = converter.to_bytes(value);
-      uint8_t bits_remaining = DATA_TYPE_SIZE;
+      uint8_t bits_remaining = value_size;
 
       while (bits_remaining > 0) {
-        byte_encoded |= (value << (DATA_TYPE_SIZE - bits_remaining)) >>
-                        (DATA_TYPE_SIZE - DerivedT::BitsPerByte + bits_encoded);
+        value_type lshifted = (value_type)(value)
+                              << (value_size - bits_remaining);
+        value_type rshifted =
+            lshifted >>
+            (value_size - DerivedT::EncodedBitsPerByte + bits_encoded);
+        byte_encoded |= (uint8_t)rshifted;
 
-        if (bits_remaining < DerivedT::BitsPerByte) {
+        if (bits_remaining < DerivedT::EncodedBitsPerByte) {
           bits_encoded = bits_remaining;
           bits_remaining = 0;
         } else {
           result.push_back(DerivedT::ALPHABET[byte_encoded]);
           bytes_encoded++;
+          bits_remaining -= DerivedT::EncodedBitsPerByte - bits_encoded;
           bits_encoded = 0;
           byte_encoded = 0;
-          bits_remaining -= DerivedT::BitsPerByte;
         }
       }
     }
@@ -58,7 +57,7 @@ public:
       bytes_encoded++;
     }
 
-    while (bytes_encoded % ENCODED_BIT_SIZE != 0) {
+    while (bytes_encoded % DerivedT::WORD_GROUP_SIZE != 0) {
       result.push_back(DerivedT::PADDING);
       bytes_encoded++;
     }

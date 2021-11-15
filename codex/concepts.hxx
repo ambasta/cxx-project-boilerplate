@@ -10,7 +10,7 @@
 
 template <typename RangeT>
 concept EncodingInputConcept = std::ranges::input_range<RangeT> and
-    std::convertible_to<std::ranges::range_value_t<RangeT>, uint8_t>;
+    std::unsigned_integral<std::ranges::range_value_t<RangeT>>;
 
 template <typename RangeT, typename ValueT>
 concept EncodingOutputConcept = std::ranges::output_range<RangeT, ValueT> and
@@ -20,8 +20,9 @@ concept EncodingOutputConcept = std::ranges::output_range<RangeT, ValueT> and
 // encoder -> should take uint8_t*, size and return encoded string
 // decoder -> should take encoded string and return vector<uint8_t>
 
-template <typename EncoderT>
-concept EncoderConcept = requires(const std::vector<uint8_t> &input) {
+template <typename EncoderT, typename InputT>
+concept EncoderConcept = EncodingInputConcept<InputT> and
+    requires(const InputT &input) {
   EncoderT::alphabet;
   requires std::ranges::input_range<decltype(EncoderT::encode(input))>;
 
@@ -37,17 +38,13 @@ concept EncoderConcept = requires(const std::vector<uint8_t> &input) {
   { EncoderT::encode(input) } -> std::convertible_to<std::string_view>;
 
   {
-    EncoderT::encode(input.data(), input.size())
-    } -> std::convertible_to<std::string_view>;
-
-  {
     EncoderT::decode(std::string_view{})
     } -> std::convertible_to<std::vector<uint8_t>>;
 };
 
 template <typename CodecT, typename EncoderT, typename EncodingInputT,
           typename OutputValueT, typename EncodingOutputT>
-concept CodecConcept = EncoderConcept<EncoderT> and
+concept CodecConcept = EncoderConcept<EncoderT, EncodingInputT> and
     EncodingInputConcept<EncodingInputT> and
     EncodingOutputConcept<EncodingOutputT, OutputValueT> and
     requires(CodecT codec, EncodingInputT input, EncodingOutputT &output) {
